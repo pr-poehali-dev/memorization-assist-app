@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
+import * as pdfjsLib from 'pdfjs-dist';
+import mammoth from 'mammoth';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent } from '@/components/ui/card';
@@ -34,24 +36,49 @@ const Index = () => {
     }
   };
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    if (!file.name.match(/\.(txt|doc|docx)$/i)) {
-      alert('Поддерживаются только текстовые файлы (.txt)');
-      return;
-    }
+    const fileExtension = file.name.split('.').pop()?.toLowerCase();
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const content = e.target?.result as string;
-      setText(content);
-    };
-    reader.onerror = () => {
-      alert('Ошибка при чтении файла');
-    };
-    reader.readAsText(file);
+    try {
+      if (fileExtension === 'txt') {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const content = e.target?.result as string;
+          setText(content);
+        };
+        reader.onerror = () => {
+          alert('Ошибка при чтении файла');
+        };
+        reader.readAsText(file);
+      } else if (fileExtension === 'pdf') {
+        const arrayBuffer = await file.arrayBuffer();
+        pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
+        
+        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        let fullText = '';
+        
+        for (let i = 1; i <= pdf.numPages; i++) {
+          const page = await pdf.getPage(i);
+          const textContent = await page.getTextContent();
+          const pageText = textContent.items.map((item: any) => item.str).join(' ');
+          fullText += pageText + '\n';
+        }
+        
+        setText(fullText.trim());
+      } else if (fileExtension === 'docx') {
+        const arrayBuffer = await file.arrayBuffer();
+        const result = await mammoth.extractRawText({ arrayBuffer });
+        setText(result.value);
+      } else {
+        alert('Поддерживаются форматы: .txt, .pdf, .docx');
+      }
+    } catch (error) {
+      console.error('Error reading file:', error);
+      alert('Ошибка при чтении файла. Попробуй другой файл.');
+    }
   };
 
   const getTextSegments = () => {
@@ -247,7 +274,7 @@ const Index = () => {
               <input
                 id="file-input"
                 type="file"
-                accept=".txt,.doc,.docx"
+                accept=".txt,.pdf,.docx"
                 onChange={handleFileUpload}
                 className="hidden"
               />
