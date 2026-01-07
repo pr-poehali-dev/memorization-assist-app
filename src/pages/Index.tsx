@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent } from '@/components/ui/card';
@@ -19,6 +19,10 @@ const Index = () => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [score, setScore] = useState(0);
   const [attempts, setAttempts] = useState(0);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordedText, setRecordedText] = useState('');
+  const [matchAccuracy, setMatchAccuracy] = useState<number | null>(null);
+  const recognitionRef = useRef<any>(null);
 
   const handleUpload = () => {
     if (text.trim()) {
@@ -56,11 +60,74 @@ const Index = () => {
     }
   };
 
+  useEffect(() => {
+    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      recognitionRef.current = new SpeechRecognition();
+      recognitionRef.current.continuous = false;
+      recognitionRef.current.interimResults = false;
+      recognitionRef.current.lang = 'ru-RU';
+
+      recognitionRef.current.onresult = (event: any) => {
+        const transcript = event.results[0][0].transcript;
+        setRecordedText(transcript);
+        
+        const accuracy = calculateAccuracy(currentSegment, transcript);
+        setMatchAccuracy(accuracy);
+        setAttempts(prev => prev + 1);
+        
+        if (accuracy >= 70) {
+          setScore(prev => prev + 1);
+        }
+        setIsRecording(false);
+      };
+
+      recognitionRef.current.onerror = () => {
+        setIsRecording(false);
+      };
+
+      recognitionRef.current.onend = () => {
+        setIsRecording(false);
+      };
+    }
+
+    return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+    };
+  }, [currentSegment]);
+
+  const calculateAccuracy = (original: string, spoken: string): number => {
+    const originalWords = original.toLowerCase().replace(/[.,!?;:]/g, '').split(/\s+/);
+    const spokenWords = spoken.toLowerCase().replace(/[.,!?;:]/g, '').split(/\s+/);
+    
+    let matches = 0;
+    const maxLength = Math.max(originalWords.length, spokenWords.length);
+    
+    for (let i = 0; i < Math.min(originalWords.length, spokenWords.length); i++) {
+      if (originalWords[i] === spokenWords[i]) {
+        matches++;
+      }
+    }
+    
+    return Math.round((matches / maxLength) * 100);
+  };
+
   const handlePractice = () => {
-    setAttempts(attempts + 1);
-    const success = Math.random() > 0.3;
-    if (success) {
-      setScore(score + 1);
+    if (!recognitionRef.current) {
+      alert('Голосовое распознавание не поддерживается в вашем браузере');
+      return;
+    }
+
+    if (isRecording) {
+      recognitionRef.current.stop();
+      setIsRecording(false);
+    } else {
+      setRecordedText('');
+      setMatchAccuracy(null);
+      setIsRecording(true);
+      recognitionRef.current.start();
     }
   };
 
@@ -206,12 +273,30 @@ const Index = () => {
 
                 <Button 
                   onClick={handlePractice}
-                  className="w-full h-14 text-base"
-                  variant="default"
+                  className={`w-full h-14 text-base transition-colors ${
+                    isRecording ? 'bg-red-500 hover:bg-red-600' : ''
+                  }`}
+                  variant={isRecording ? 'destructive' : 'default'}
                 >
-                  <Icon name="CircleDot" size={20} className="mr-2" />
-                  Начать запись
+                  <Icon name={isRecording ? 'MicOff' : 'Mic'} size={20} className="mr-2" />
+                  {isRecording ? 'Остановить запись' : 'Начать запись'}
                 </Button>
+
+                {recordedText && (
+                  <Card className="bg-muted/30">
+                    <CardContent className="pt-4 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium">Вы сказали:</span>
+                        {matchAccuracy !== null && (
+                          <Badge variant={matchAccuracy >= 70 ? 'default' : 'secondary'}>
+                            {matchAccuracy}% совпадение
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-sm text-muted-foreground italic">"{recordedText}"</p>
+                    </CardContent>
+                  </Card>
+                )}
 
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
