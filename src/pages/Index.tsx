@@ -51,12 +51,43 @@ const Index = () => {
   const handleNext = () => {
     if (currentIndex < segments.length - 1) {
       setCurrentIndex(currentIndex + 1);
+      setRecordedText('');
+      setMatchAccuracy(null);
     }
   };
 
   const handlePrevious = () => {
     if (currentIndex > 0) {
       setCurrentIndex(currentIndex - 1);
+      setRecordedText('');
+      setMatchAccuracy(null);
+    }
+  };
+
+  const handlePlayPause = () => {
+    if (!('speechSynthesis' in window)) {
+      alert('Синтез речи не поддерживается в вашем браузере');
+      return;
+    }
+
+    if (isPlaying) {
+      window.speechSynthesis.cancel();
+      setIsPlaying(false);
+    } else {
+      const utterance = new SpeechSynthesisUtterance(currentSegment);
+      utterance.lang = 'ru-RU';
+      utterance.rate = speed[0];
+      
+      utterance.onend = () => {
+        setIsPlaying(false);
+      };
+      
+      utterance.onerror = () => {
+        setIsPlaying(false);
+      };
+      
+      window.speechSynthesis.speak(utterance);
+      setIsPlaying(true);
     }
   };
 
@@ -95,6 +126,7 @@ const Index = () => {
       if (recognitionRef.current) {
         recognitionRef.current.stop();
       }
+      window.speechSynthesis.cancel();
     };
   }, [currentSegment]);
 
@@ -246,7 +278,7 @@ const Index = () => {
                     <Icon name="ChevronLeft" size={18} />
                   </Button>
                   <Button
-                    onClick={() => setIsPlaying(!isPlaying)}
+                    onClick={handlePlayPause}
                     className="flex-[2]"
                   >
                     <Icon name={isPlaying ? "Pause" : "Play"} size={18} className="mr-2" />
