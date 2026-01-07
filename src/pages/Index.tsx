@@ -34,6 +34,26 @@ const Index = () => {
     }
   };
 
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.name.match(/\.(txt|doc|docx)$/i)) {
+      alert('Поддерживаются только текстовые файлы (.txt)');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const content = e.target?.result as string;
+      setText(content);
+    };
+    reader.onerror = () => {
+      alert('Ошибка при чтении файла');
+    };
+    reader.readAsText(file);
+  };
+
   const getTextSegments = () => {
     if (!uploadedText) return [];
     
@@ -206,14 +226,31 @@ const Index = () => {
                   className="min-h-[200px] resize-none text-base"
                 />
               </div>
-              <Button 
-                onClick={handleUpload} 
-                className="w-full h-12 text-base"
-                disabled={!text.trim()}
-              >
-                <Icon name="Upload" size={20} className="mr-2" />
-                Загрузить текст
-              </Button>
+
+              <div className="flex gap-2">
+                <Button 
+                  onClick={handleUpload} 
+                  className="flex-1 h-12 text-base"
+                  disabled={!text.trim()}
+                >
+                  <Icon name="Upload" size={20} className="mr-2" />
+                  Загрузить текст
+                </Button>
+                <Button
+                  variant="outline"
+                  className="h-12 px-4"
+                  onClick={() => document.getElementById('file-input')?.click()}
+                >
+                  <Icon name="FolderOpen" size={20} />
+                </Button>
+              </div>
+              <input
+                id="file-input"
+                type="file"
+                accept=".txt,.doc,.docx"
+                onChange={handleFileUpload}
+                className="hidden"
+              />
             </CardContent>
           </Card>
         ) : (
