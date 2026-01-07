@@ -22,6 +22,7 @@ const Index = () => {
   const [isRecording, setIsRecording] = useState(false);
   const [recordedText, setRecordedText] = useState('');
   const [matchAccuracy, setMatchAccuracy] = useState<number | null>(null);
+  const [errorMessage, setErrorMessage] = useState('');
   const recognitionRef = useRef<any>(null);
 
   const handleUpload = () => {
@@ -113,8 +114,17 @@ const Index = () => {
         setIsRecording(false);
       };
 
-      recognitionRef.current.onerror = () => {
+      recognitionRef.current.onerror = (event: any) => {
+        console.error('Speech recognition error:', event.error);
         setIsRecording(false);
+        
+        if (event.error === 'not-allowed') {
+          setErrorMessage('Доступ к микрофону заблокирован. Разреши доступ в настройках браузера.');
+        } else if (event.error === 'no-speech') {
+          setErrorMessage('Речь не обнаружена. Попробуй говорить громче.');
+        } else {
+          setErrorMessage(`Ошибка распознавания: ${event.error}`);
+        }
       };
 
       recognitionRef.current.onend = () => {
@@ -148,7 +158,7 @@ const Index = () => {
 
   const handlePractice = () => {
     if (!recognitionRef.current) {
-      alert('Голосовое распознавание не поддерживается в вашем браузере');
+      setErrorMessage('Голосовое распознавание не поддерживается в вашем браузере. Используй Chrome, Edge или Safari.');
       return;
     }
 
@@ -158,8 +168,16 @@ const Index = () => {
     } else {
       setRecordedText('');
       setMatchAccuracy(null);
+      setErrorMessage('');
       setIsRecording(true);
-      recognitionRef.current.start();
+      
+      try {
+        recognitionRef.current.start();
+      } catch (error) {
+        console.error('Failed to start recognition:', error);
+        setIsRecording(false);
+        setErrorMessage('Не удалось запустить микрофон. Проверь разрешения браузера.');
+      }
     }
   };
 
@@ -313,6 +331,17 @@ const Index = () => {
                   <Icon name={isRecording ? 'MicOff' : 'Mic'} size={20} className="mr-2" />
                   {isRecording ? 'Остановить запись' : 'Начать запись'}
                 </Button>
+
+                {errorMessage && (
+                  <Card className="bg-destructive/10 border-destructive/20">
+                    <CardContent className="pt-4">
+                      <div className="flex items-start gap-2">
+                        <Icon name="AlertCircle" size={18} className="text-destructive mt-0.5" />
+                        <p className="text-sm text-destructive">{errorMessage}</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
 
                 {recordedText && (
                   <Card className="bg-muted/30">
